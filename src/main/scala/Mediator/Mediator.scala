@@ -10,20 +10,28 @@ import akka.actor.{Terminated, ActorRef, Actor}
 
 class Mediator extends Actor {
   import collection.mutable.{Set => mSet, Map => mMap}
+
+    // For personal messages and broadcast, message type -> list of colleagues interested
   val fTable = mMap[Class[_], mSet[ActorRef]]()
-  val notifySet = mSet[ActorRef]()
-  val globalMsg = mSet[Class[_]]()
+
+  val notifySet = mSet[ActorRef]()    // For broadcast only
+  val globalMsg = mSet[Class[_]]()    // Types for broadcast
 
   def receive = {
+      // Register a message type for broadcast to all colleagues
     case RegisterBroadcastMessage(msg) => globalMsg += msg
+
+      // Registering a colleague for broadcast messages only
     case RegisterForNotification(act) =>
       notifySet += act
       context watch act
 
+      // Register a colleague for personal and broadcast messages
     case RegisterForReceive(act, mt) =>
       fTable += ((mt, fTable.getOrElse(mt, mSet[ActorRef]())+act ))
       context watch act
 
+      // un-register a colleague from the mediator
     case Unregister(act) =>
       context unwatch act
       fTable.foreach { case(m, al) =>
@@ -31,16 +39,18 @@ class Mediator extends Actor {
       }
       notifySet -= act
 
+      // in-case actor terminates, un-register
     case Terminated(act) => self ! Unregister(act)
 
+      // Actual Message forwarding algorithm
     case msg =>
-      if (globalMsg.exists{ _.isAssignableFrom(msg.getClass)}) {
+      if (globalMsg.exists{ _.isAssignableFrom(msg.getClass)}) {    // First check if its a broadcast
         notifySet.foreach{_!msg}
         fTable.values.reduce(_++_).foreach{_!msg}
       }
-      else
-        fTable.foreach { case(m, al) =>
-          if (m.isAssignableFrom(msg.getClass))
+      else        // Its a personal message
+        fTable.foreach { case(m, al) =>           // a message is sent to anyone who has registered
+          if (m.isAssignableFrom(msg.getClass))   // that type or a super-type
             al.foreach{_ ! msg}
         }
   }
