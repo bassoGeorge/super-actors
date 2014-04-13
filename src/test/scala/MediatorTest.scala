@@ -1,8 +1,6 @@
-import akka.actor.{Props, ActorSystem}
-import akka.testkit._
+import akka.actor._
 import Mediator._
-import org.scalatest._
-import org.scalatest.matchers._
+import akka.actor.ActorDSL._
 
 object MediatorTest {
   val test = new MediatorTest()
@@ -16,33 +14,52 @@ class MediatorTest extends IntegrationTest {
 
   val mediator = system.actorOf(Props[Mediator], "testingMediator")
 
-  "Mediator" should "Reply back message" in {
+  val dummyAct = actor (new Act{    // Dummy actor to forward messages to mediator
+    become{                         // so that it becomes the sender, and we can receive all messages
+      case msg => mediator ! msg
+    }
+  })
+
+  val ourMessage = new Msg("Test message") with TestMessage
+  val globalMessage = new Msg("Global") with TestGlobal
+
+  "Mediator" should "forward us our message" in {
     mediator ! RegisterForReceive(testActor, classOf[TestMessage])
-    mediator ! new Msg("Test message") with TestMessage
+    dummyAct ! ourMessage
     expectMsg(Msg("Test message"))
   }
 
-  it should "not Reply anything" in {
-    mediator ! Msg("Test message")
+  it should "not send us back our message" in {
+    mediator ! ourMessage
     expectNoMsg()
   }
 
-  it should "Broadcast global message" in {
+  it should "not send us the message not intended for us" in {
+    dummyAct ! Msg("Test message")
+    expectNoMsg()
+  }
+
+  it should "Broadcast global message to us" in {
     mediator ! RegisterBroadcastMessage(classOf[TestGlobal])
-    mediator ! new Msg("Test message") with TestGlobal
-    expectMsg(Msg("Test message"))
+    dummyAct ! globalMessage
+    expectMsg(Msg("Global"))
   }
 
-  it should "not Reply after unRegistering" in {
-    mediator ! Unregister(testActor)
-    mediator ! new Msg("Test message") with TestMessage
+  it should "Not send us back the message we sent for broadcast" in {
+    mediator ! globalMessage
     expectNoMsg()
   }
 
-  it should "Reply with only global message and not personal ones" in {
+  it should "not send us any more messages after we have Un-registered ourselves" in {
+    mediator ! Unregister(testActor)
+    dummyAct ! ourMessage
+    expectNoMsg()
+  }
+
+  it should "send us only broadcasts and no personal messages since we have only registered for notification" in {
     mediator ! RegisterForNotification(testActor)
-    mediator ! new Msg("Global") with TestGlobal
-    mediator ! new Msg("Personal") with TestMessage
+    dummyAct ! ourMessage
+    dummyAct ! globalMessage
     expectMsg(Msg("Global"))
   }
 }

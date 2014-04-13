@@ -17,6 +17,10 @@ class Mediator extends Actor {
   val notifySet = mSet[ActorRef]()    // For broadcast only
   val globalMsg = mSet[Class[_]]()    // Types for broadcast
 
+  def sendMsgFn(sender: ActorRef)(act: ActorRef, msg: Any) {
+    if (act != sender) act ! msg
+  }
+
   def receive = {
       // Register a message type for broadcast to all colleagues
     case RegisterBroadcastMessage(msg) => globalMsg += msg
@@ -44,14 +48,15 @@ class Mediator extends Actor {
 
       // Actual Message forwarding algorithm
     case msg =>
+      val sendMsg = sendMsgFn(sender)_
       if (globalMsg.exists{ _.isAssignableFrom(msg.getClass)}) {    // First check if its a broadcast
-        notifySet.foreach{_!msg}
-        fTable.values.reduce(_++_).foreach{_!msg}
+        notifySet.foreach{sendMsg(_, msg)}
+        fTable.values.reduce(_++_).foreach{sendMsg(_, msg)}
       }
       else        // Its a personal message
         fTable.foreach { case(m, al) =>           // a message is sent to anyone who has registered
           if (m.isAssignableFrom(msg.getClass))   // that type or a super-type
-            al.foreach{_ ! msg}
+            al.foreach{sendMsg(_, msg)}
         }
   }
 }
