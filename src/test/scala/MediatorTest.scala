@@ -2,11 +2,6 @@ import akka.actor._
 import Mediator._
 import akka.actor.ActorDSL._
 
-object MediatorTest {
-  val test = new MediatorTest()
-  test.execute()
-}
-
 class MediatorTest extends IntegrationTest {
   trait TestMessage
   trait TestGlobal
