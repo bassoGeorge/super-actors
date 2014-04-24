@@ -1,8 +1,8 @@
 # Super-actors
-##### An akka library containing useful actors and configurations encapsulating implementing various design patterns
+##### An akka library containing useful actors and configurations implementing various design patterns
 
 version 0.1
-By [Anish 'basso' George](www.blog.anishgeorge.com)
+By [Anish 'basso' George](http://anishgeorge.com)
 
 ## Packages
 ### Mediator
